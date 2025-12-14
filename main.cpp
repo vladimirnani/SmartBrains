@@ -90,16 +90,23 @@ struct SDLApp {
         SDL_Quit();
     }
 
-    void Tick() {
+    void Input() {
         SDL_Event event;
         while (SDL_PollEvent(&event)) {
             if (event.type == SDL_EVENT_QUIT) {
                 mDone = true;
             }
             if (event.type == SDL_EVENT_KEY_DOWN) {
-                SDL_Log("Key presseed %d %d", event.key.key, event.key.mod);
+                // SDL_Log("Key presseed %d %d", event.key.key, event.key.mod);
             }
         }
+    }
+
+    void Update() {
+
+    }
+
+    void Render() {
         SDL_SetRenderDrawColor(mRenderer, 0x00, 0xFF, 0x00, 0xFF);
         SDL_RenderClear(mRenderer);
         direction_x = direction_x + direction_user_should_move_x();
@@ -109,21 +116,37 @@ struct SDLApp {
 
         winSurface = SDL_GetWindowSurface(mWindow);
 
-
         SDL_BlitSurface(sdlSurface1, NULL, winSurface, &dstrect);
         SDL_SetRenderDrawColor(mRenderer, 0x00, 0xFF, 0x00, 0xFF);
         SDL_UpdateWindowSurface(mWindow);
+    }
 
-        SDL_Delay(16);
+    void Tick() {
+        Input();
+        Update();
+        Render();
+        SDL_Delay(5);
     }
 
     void MainLoop() {
+
+        Uint64 lastTime = 0;
+        Uint64 fps = 0;
         SDL_CreateWindowAndRenderer("Steal A Brainrot", 800, 600, 0, &mWindow, &mRenderer);
 
         sdlSurface1 = SDL_LoadBMP("C:\\Users\\Vladimir\\CLionProjects\\brainrot\\sahur.bmp");
 
         while (!mDone) {
+            auto currentTime = SDL_GetTicks();
+            fps ++;
             Tick();
+            if (currentTime > lastTime + 1000){
+                lastTime = currentTime;
+                std::string title;
+                title += "Brainrot FPS:" + std::to_string(fps);
+                SDL_SetWindowTitle(mWindow, title.c_str());
+                fps = 0;
+            }
         }
 
         printf("Hello, World!\n");
@@ -133,5 +156,6 @@ struct SDLApp {
 int main() {
     auto app = SDLApp();
     app.MainLoop();
+
     return 0;
 }
