@@ -2,6 +2,7 @@
 #include <cstdio>
 #include <iostream>
 #include <SDL3/SDL.h>
+#include <SDL3_ttf/SDL_ttf.h>
 
 typedef enum BRAINROT_TYPE {
     COMMON,
@@ -18,66 +19,34 @@ typedef struct Brainrot {
     BRAINROT_TYPE brainrot_type;
 } Brainrot;
 
-int direction_user_should_move_y() {
-    const bool *key_states = SDL_GetKeyboardState(NULL);
-    int direction = 0;
-
-    /* (We're writing our code such that it sees both keys are pressed and cancels each other out!) */
-    if (key_states[SDL_SCANCODE_W]) {
-        direction += -1; /* pressed what would be "W" on a US QWERTY keyboard. Move forward! */
-    }
-
-    if (key_states[SDL_SCANCODE_S]) {
-        direction += 1; /* pressed what would be "S" on a US QWERTY keyboard. Move backward! */
-    }
-
-    /* (In practice it's likely you'd be doing full directional input in here, but for simplicity, we're just showing forward and backward) */
-
-    return direction; /* wasn't key in W or S location, don't move. */
-}
-
-int direction_user_should_move_x() {
-    const bool *key_states = SDL_GetKeyboardState(NULL);
-    int direction = 0;
-
-    if (key_states[SDL_SCANCODE_D]) {
-        direction += 1; /* pressed what would be "W" on a US QWERTY keyboard. Move forward! */
-    }
-
-    if (key_states[SDL_SCANCODE_A]) {
-        direction += -1; /* pressed what would be "S" on a US QWERTY keyboard. Move backward! */
-    }
-
-    /* (In practice it's likely you'd be doing full directional input in here, but for simplicity, we're just showing forward and backward) */
-
-    return direction; /* wasn't key in W or S location, don't move. */
-}
-
-
 
 struct Sprite {
     SDL_Texture *characterTexture;
     SDL_FRect source;
     SDL_FRect postion;
-    float direction_x = 0;
-    float direction_y = 0;
+    float deltaX = 0;
+    float deltaY = 0;
+    bool isSprinting = false;
     int animation_step = -1;
     int animation_total = 4;
     int animation_sync = 0;
-        int frameWidth = 200;
+    int frameWidth = 200;
+    bool isMoving = true;
+    float money = 0;
+
+    std::stringstream debug_text;
 
     Sprite() {
-
     }
 
     Sprite(SDL_Renderer *mRenderer) {
-        direction_x = 0;
-        direction_y = 0;
+        deltaX = 0;
+        deltaY = 0;
 
         postion = SDL_FRect{0, 0, 200, 245};
         source = SDL_FRect{0, 0, 200, 245};
 
-        SDL_Surface *sdlSurface1 = SDL_LoadBMP("..\\dude.bmp");
+        SDL_Surface *sdlSurface1 = SDL_LoadBMP("..\\crosanini.bmp");
         characterTexture = SDL_CreateTextureFromSurface(mRenderer, sdlSurface1);
         SDL_DestroySurface(sdlSurface1);
     }
@@ -86,32 +55,74 @@ struct Sprite {
         SDL_DestroyTexture(characterTexture);
     }
 
-    void SetPosition(float x, float y) {
+    void UpdatePosition() {
+        const bool *key_states = SDL_GetKeyboardState(NULL);
+        isSprinting = key_states[SDL_SCANCODE_LSHIFT] || key_states[SDL_SCANCODE_RSHIFT];
+        float stepLength = 10;
+        if (isSprinting) {
+            stepLength = 25;
+        }
+        deltaX = 0;
+        deltaY = 0;
+        if (key_states[SDL_SCANCODE_D] || key_states[SDL_SCANCODE_RIGHT]) {
+            deltaX = stepLength;
+        }
+        if (key_states[SDL_SCANCODE_A] || key_states[SDL_SCANCODE_LEFT]) {
+            deltaX = -stepLength;
+        }
+        if (key_states[SDL_SCANCODE_W] || key_states[SDL_SCANCODE_UP]) {
+            deltaY = -stepLength;
+        }
+        if (key_states[SDL_SCANCODE_S] || key_states[SDL_SCANCODE_DOWN]) {
+            deltaY = stepLength;
+        }
+
+        postion.x += deltaX;
+        postion.y += deltaY;
+    }
+
+    void UpdateAnimation() {
+        if (deltaY || deltaX) {
+            animation_step = (animation_step + 1) % animation_total;
+            if (postion.x != deltaX) {
+                source.x = animation_step * frameWidth;
+            } else if (postion.y != deltaY) {
+                source.x = animation_step * frameWidth;
+            } else {
+                source.x = 0;
+            }
+        }
+
+    }
+
+    void UpdateDebugText() {
+        debug_text.str("");
+        debug_text << "Money: " << money << " $\n" << std::endl;
+
+        if (isSprinting) {
+            debug_text << "Sprinting" << std::endl;
+        }
 
     }
 
     void Update() {
-        animation_step = (animation_step + 1) % animation_total;
-        direction_x = direction_x + direction_user_should_move_x();
-        direction_y = direction_y + direction_user_should_move_y();
-        animation_sync = (animation_sync + 1) % 10;
-        if (postion.x != direction_x) {
-            postion.x = direction_x;
-            if (animation_sync == 0) {
-                source.x = animation_step * frameWidth;
-            }
-        } else if (postion.y != direction_y) {
-            postion.y = direction_y;
-            if (animation_sync == 0) {
-                source.x = animation_step * frameWidth;
-            }
-        } else {
-            source.x = 0;
-        }
+        UpdatePosition();
+        UpdateAnimation();
+        UpdateDebugText();
+        money++;
     }
 
     void Render(SDL_Renderer *mRenderer) {
         SDL_RenderTexture(mRenderer, characterTexture, &source, &postion);
+        SDL_SetRenderDrawColor(mRenderer, 0xff,0xff,0xff,0xff);
+
+        SDL_RenderDebugText(mRenderer, postion.x + 40, postion.y + 20, "crosanini maslonini");
+        SDL_SetRenderDrawColor(mRenderer, 0xff,0x33,0x33,0xff);
+        SDL_RenderDebugText(mRenderer, postion.x + 40, postion.y + 40, "smartbrain god");
+        SDL_RenderDebugText(mRenderer, postion.x + 40, postion.y + 60, "3k 900$.s");
+
+        SDL_SetRenderDrawColor(mRenderer, 0x00,0xff,0xff,0xff);
+        SDL_RenderDebugText(mRenderer, 10,  10, debug_text.str().c_str());
     }
 };
 
@@ -119,7 +130,7 @@ struct SDLApp {
     SDL_Window *mWindow;
     SDL_Renderer *mRenderer;
     bool mDone = false;
-    Sprite* mainCharacter;
+    Sprite *mainCharacter;
 
     void create_scene() {
         mainCharacter = new Sprite(mRenderer);
@@ -131,7 +142,7 @@ struct SDLApp {
         std::stringstream ss("Dec 13 2025 12:35:34");
         ss >> std::get_time(&tm, "%b %d %Y %H:%M:%S");
         const auto tp = std::chrono::system_clock::from_time_t(std::mktime(&tm));
-        SDL_CreateWindowAndRenderer("Steal A Brainrot", 800, 600, 0, &mWindow, &mRenderer);
+        SDL_CreateWindowAndRenderer("Steal A Brainrot", 1280, 1024, 0, &mWindow, &mRenderer);
         if (mRenderer) {
             SDL_Log("renderer %s", SDL_GetRendererName(mRenderer));
         }
@@ -177,7 +188,7 @@ struct SDLApp {
         Input();
         Update();
         Render();
-        SDL_Delay(10);
+        SDL_Delay(50);
     }
 
     void MainLoop() {
