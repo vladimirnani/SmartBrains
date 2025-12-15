@@ -18,7 +18,6 @@ typedef struct Brainrot {
     BRAINROT_TYPE brainrot_type;
 } Brainrot;
 
-
 int direction_user_should_move_y() {
     const bool *key_states = SDL_GetKeyboardState(NULL);
     int direction = 0;
@@ -54,16 +53,77 @@ int direction_user_should_move_x() {
     return direction; /* wasn't key in W or S location, don't move. */
 }
 
+
+
+struct Sprite {
+    SDL_Texture *characterTexture;
+    SDL_FRect source;
+    SDL_FRect postion;
+    float direction_x = 0;
+    float direction_y = 0;
+    int animation_step = -1;
+    int animation_total = 4;
+    int animation_sync = 0;
+        int frameWidth = 200;
+
+    Sprite() {
+
+    }
+
+    Sprite(SDL_Renderer *mRenderer) {
+        direction_x = 0;
+        direction_y = 0;
+
+        postion = SDL_FRect{0, 0, 200, 245};
+        source = SDL_FRect{0, 0, 200, 245};
+
+        SDL_Surface *sdlSurface1 = SDL_LoadBMP("..\\dude.bmp");
+        characterTexture = SDL_CreateTextureFromSurface(mRenderer, sdlSurface1);
+        SDL_DestroySurface(sdlSurface1);
+    }
+
+    ~Sprite() {
+        SDL_DestroyTexture(characterTexture);
+    }
+
+    void SetPosition(float x, float y) {
+
+    }
+
+    void Update() {
+        animation_step = (animation_step + 1) % animation_total;
+        direction_x = direction_x + direction_user_should_move_x();
+        direction_y = direction_y + direction_user_should_move_y();
+        animation_sync = (animation_sync + 1) % 10;
+        if (postion.x != direction_x) {
+            postion.x = direction_x;
+            if (animation_sync == 0) {
+                source.x = animation_step * frameWidth;
+            }
+        } else if (postion.y != direction_y) {
+            postion.y = direction_y;
+            if (animation_sync == 0) {
+                source.x = animation_step * frameWidth;
+            }
+        } else {
+            source.x = 0;
+        }
+    }
+
+    void Render(SDL_Renderer *mRenderer) {
+        SDL_RenderTexture(mRenderer, characterTexture, &source, &postion);
+    }
+};
+
 struct SDLApp {
     SDL_Window *mWindow;
     SDL_Renderer *mRenderer;
     bool mDone = false;
-    SDL_Surface *sdlSurface1;
-    SDL_Surface *winSurface;
-    SDL_Rect charRect;
-    SDL_Rect dstrect;
-    int direction_x = 0;
-    int direction_y = 0;
+    Sprite* mainCharacter;
+
+    void create_scene() {
+        mainCharacter = new Sprite(mRenderer);
+    }
 
     SDLApp() {
         SDL_Init(SDL_INIT_VIDEO);
@@ -71,13 +131,11 @@ struct SDLApp {
         std::stringstream ss("Dec 13 2025 12:35:34");
         ss >> std::get_time(&tm, "%b %d %Y %H:%M:%S");
         const auto tp = std::chrono::system_clock::from_time_t(std::mktime(&tm));
-
-        direction_x = 0;
-        direction_y = 0;
-
-        charRect = {50, 50, 50, 50};
-        dstrect = {0, 0, 100, 100};
-
+        SDL_CreateWindowAndRenderer("Steal A Brainrot", 800, 600, 0, &mWindow, &mRenderer);
+        if (mRenderer) {
+            SDL_Log("renderer %s", SDL_GetRendererName(mRenderer));
+        }
+        create_scene();
         Brainrot brainrot_six_seven = {
             10000, 67,
             tp,
@@ -87,6 +145,8 @@ struct SDLApp {
 
     ~SDLApp() {
         SDL_DestroyWindow(mWindow);
+        SDL_DestroyRenderer(mRenderer);
+        delete mainCharacter;
         SDL_Quit();
     }
 
@@ -103,44 +163,31 @@ struct SDLApp {
     }
 
     void Update() {
-
+        mainCharacter->Update();
     }
 
     void Render() {
-        SDL_SetRenderDrawColor(mRenderer, 0x00, 0xFF, 0x00, 0xFF);
+        SDL_SetRenderDrawColor(mRenderer, 0x00, 0x00, 0x00, 0xFF);
         SDL_RenderClear(mRenderer);
-        direction_x = direction_x + direction_user_should_move_x();
-        direction_y = direction_y + direction_user_should_move_y();
-        dstrect.x = direction_x;
-        dstrect.y = direction_y;
-
-        winSurface = SDL_GetWindowSurface(mWindow);
-
-        SDL_BlitSurface(sdlSurface1, NULL, winSurface, &dstrect);
-        SDL_SetRenderDrawColor(mRenderer, 0x00, 0xFF, 0x00, 0xFF);
-        SDL_UpdateWindowSurface(mWindow);
+        mainCharacter->Render(mRenderer);
+        SDL_RenderPresent(mRenderer);
     }
 
     void Tick() {
         Input();
         Update();
         Render();
-        SDL_Delay(5);
+        SDL_Delay(10);
     }
 
     void MainLoop() {
-
         Uint64 lastTime = 0;
         Uint64 fps = 0;
-        SDL_CreateWindowAndRenderer("Steal A Brainrot", 800, 600, 0, &mWindow, &mRenderer);
-
-        sdlSurface1 = SDL_LoadBMP("C:\\Users\\Vladimir\\CLionProjects\\brainrot\\sahur.bmp");
-
         while (!mDone) {
-            auto currentTime = SDL_GetTicks();
-            fps ++;
             Tick();
-            if (currentTime > lastTime + 1000){
+            auto currentTime = SDL_GetTicks();
+            fps++;
+            if (currentTime > lastTime + 1000) {
                 lastTime = currentTime;
                 std::string title;
                 title += "Brainrot FPS:" + std::to_string(fps);
@@ -156,6 +203,5 @@ struct SDLApp {
 int main() {
     auto app = SDLApp();
     app.MainLoop();
-
     return 0;
 }
