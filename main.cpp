@@ -7,6 +7,8 @@
 #define WINDOW_HEIGHT 1024
 #define WINDOW_WIDTH 1920
 
+struct SDLApp;
+
 struct SmartBrain {
     const char * name;
     const char * path;
@@ -35,6 +37,8 @@ struct Background {
         SDL_RenderTexture(mRenderer, bgTexture, NULL, NULL);
     }
 };
+
+
 struct Sprite {
     SDL_FRect source;
     SDL_FRect position;
@@ -84,7 +88,7 @@ struct Player: Sprite {
     double money = 0;
     int playerNumber;
 
-    Player(SDL_Renderer *mRenderer, const int number, const std::string& path): Sprite(mRenderer, path) {
+    Player(SDL_Renderer *mRenderer, const int number, const std::string& path): Sprite(mRenderer, path){
         deltaX = 0;
         deltaY = 0;
         playerNumber = number;
@@ -96,15 +100,18 @@ struct Player: Sprite {
 
 
     void UpdatePosition() {
+        deltaX = 0;
+        deltaY = 0;
+
         const bool *key_states = SDL_GetKeyboardState(NULL);
+
         if (playerNumber == 1) {
             isSprinting = key_states[SDL_SCANCODE_RSHIFT];
         }
         else {
             isSprinting = key_states[SDL_SCANCODE_LSHIFT];
         }
-        deltaX = 0;
-        deltaY=0;
+
         float stepLength = 10;
         if (isSprinting) {
             stepLength = 30;
@@ -138,8 +145,22 @@ struct Player: Sprite {
             }
         }
 
+
         position.x += deltaX;
+        if (position.x > WINDOW_WIDTH) {
+            position.x =0;
+        }
+        if (position.x < 0) {
+            position.x = WINDOW_WIDTH;
+        }
         position.y += deltaY;
+        if (position.y > WINDOW_HEIGHT) {
+            position.y = 0;
+        }
+
+        if (position.y < 0) {
+            position.y = WINDOW_HEIGHT;
+        }
     }
 
     void UpdateAnimation() {
@@ -181,7 +202,7 @@ struct SmartBrainCharacter: Sprite {
 
     SmartBrainCharacter(SDL_Renderer *mRenderer, const SmartBrain* data): Sprite(mRenderer, data->path) {
         mData = data;
-        float xPos = data->playerNumber * 200;
+        float xPos = data->playerNumber * 400;
         float yPos =  WINDOW_HEIGHT / 2 - spriteHeight / 2;
         position = SDL_FRect{xPos, yPos, 200, spriteHeight};
         source = SDL_FRect{0, 0, 200, spriteHeight};
@@ -256,6 +277,19 @@ struct SmartBrainCharacter: Sprite {
 };
 
 
+struct Portal: Sprite {
+
+    Portal(SDL_Renderer *mRenderer, const std::string& path, float x, float y): Sprite(mRenderer, path) {
+        deltaX = 0;
+        deltaY = 0;
+        float spriteHeight = 92;
+        float spriteWidth = 204;
+
+        position = SDL_FRect{x, y, spriteWidth, spriteHeight};
+        source = SDL_FRect{0, 0, spriteWidth, spriteHeight};
+    }
+};
+
 struct SDLApp {
     SDL_Window *mWindow;
     SDL_Renderer *mRenderer;
@@ -267,6 +301,8 @@ struct SDLApp {
     Background * bg;
     SmartBrain * crosanini;
     SmartBrain * lasfantas;
+    Portal * portal1;
+    Portal * portal2;
 
     void create_scene() {
         bg = new Background(mRenderer);
@@ -274,6 +310,8 @@ struct SDLApp {
         lasFantasSprite = new SmartBrainCharacter(mRenderer, lasfantas);
         PlayerLeft = new Player(mRenderer, 1, "..\\max.bmp");
         PlayerRight = new Player(mRenderer, 2, "..\\dude.bmp");
+        portal1 = new Portal(mRenderer,  "..\\portal.bmp", 200, 200);
+        portal2 = new Portal(mRenderer,  "..\\portal.bmp", 1000, 800);
     }
 
     SDLApp() {
@@ -331,11 +369,35 @@ struct SDLApp {
         }
     }
 
+    int teleport(Player *player, Portal *source, Portal *target) const {
+        auto x = player->position.x + player->spriteWidth / 2;
+        auto y = player->position.y +  player->spriteHeight;
+
+        if (
+            x > source->position.x && x < source->position.x + portal1->spriteWidth  &&
+            y > source->position.y && y < source->position.y + portal1->spriteHeight) {
+
+            player->position.x = target->position.x ;
+            player->position.y = target->position.y;
+            return 1;
+        }
+        return 0;
+    }
+
     void Update() {
+        const bool *key_states = SDL_GetKeyboardState(NULL);
+
         PlayerLeft->Update();
         PlayerRight->Update();
         crosaniniSprite->Update();
         lasFantasSprite->Update();
+
+        if (key_states[SDL_SCANCODE_SPACE]) {
+            teleport(PlayerLeft, portal1, portal2);
+            teleport(PlayerLeft, portal2, portal1);
+            teleport(PlayerRight, portal1, portal2);
+            teleport(PlayerRight, portal2, portal1);
+        }
 
     }
 
@@ -343,6 +405,8 @@ struct SDLApp {
         SDL_SetRenderDrawColor(mRenderer, 0x00, 0x00, 0x00, 0xFF);
         SDL_RenderClear(mRenderer);
         bg->Render(mRenderer);
+        portal1->Render(mRenderer);
+        portal2->Render(mRenderer);
         crosaniniSprite->Render(mRenderer);
         lasFantasSprite->Render(mRenderer);
         PlayerLeft->Render(mRenderer);
