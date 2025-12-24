@@ -369,20 +369,53 @@ struct SDLApp {
         }
     }
 
-    int teleport(Player *player, Portal *source, Portal *target) const {
+    bool intersects(float x, float y, SDL_FRect source_pos) const {
+        return x > source_pos.x && x < source_pos.x + portal1->spriteWidth &&
+               y > source_pos.y && y < source_pos.y + portal1->spriteHeight;
+    }
+
+    void teleport(Player *player, Portal *source, Portal *target, bool initiated) const {
         auto x = player->position.x + player->spriteWidth / 2;
         auto y = player->position.y +  player->spriteHeight;
 
-        if (
-            x > source->position.x && x < source->position.x + portal1->spriteWidth  &&
-            y > source->position.y && y < source->position.y + portal1->spriteHeight) {
+        auto source_pos = source->position;
+        if (intersects(x, y, source_pos)) {
 
-            player->position.x = target->position.x ;
-            player->position.y = target->position.y;
-            return 1;
+            player->debug_text.str("");
+            player->debug_text << "Teleport available: "<< std::endl;
+
+            if (initiated) {
+
+                player->position.x = target->position.x ;
+                player->position.y = target->position.y;
+            }
         }
-        return 0;
     }
+
+    void pick_up(Player *player, SmartBrainCharacter *crosanini, SmartBrainCharacter *lasfantas,
+                 const bool *key_states) {
+        auto x = player->position.x ;
+        auto y = player->position.y ;
+
+        if (intersects(x, y, crosanini->position) ) {
+            if (player->playerNumber == 1 && key_states[SDL_SCANCODE_RETURN]) {
+                crosanini->position.y = 100;
+            }
+            if (player->playerNumber == 2 && key_states[SDL_SCANCODE_E]) {
+                crosanini->position.y = 800;
+            }
+        }
+
+        if (intersects(x, y, lasfantas->position)) {
+            if (player->playerNumber == 1 && key_states[SDL_SCANCODE_RETURN]) {
+                lasfantas->position.y = 100;
+            }
+            if (player->playerNumber == 2 && key_states[SDL_SCANCODE_E]) {
+                lasfantas->position.y = 800;
+            }
+        }
+
+    };
 
     void Update() {
         const bool *key_states = SDL_GetKeyboardState(NULL);
@@ -392,12 +425,14 @@ struct SDLApp {
         crosaniniSprite->Update();
         lasFantasSprite->Update();
 
-        if (key_states[SDL_SCANCODE_SPACE]) {
-            teleport(PlayerLeft, portal1, portal2);
-            teleport(PlayerLeft, portal2, portal1);
-            teleport(PlayerRight, portal1, portal2);
-            teleport(PlayerRight, portal2, portal1);
-        }
+        teleport(PlayerLeft, portal1, portal2,  key_states[SDL_SCANCODE_SPACE]);
+        teleport(PlayerLeft, portal2, portal1,  key_states[SDL_SCANCODE_SPACE]);
+        teleport(PlayerRight, portal1, portal2,  key_states[SDL_SCANCODE_SPACE]);
+        teleport(PlayerRight, portal2, portal1,  key_states[SDL_SCANCODE_SPACE]);
+
+
+        pick_up(PlayerLeft, crosaniniSprite, lasFantasSprite, key_states);
+        pick_up(PlayerRight, crosaniniSprite, lasFantasSprite, key_states);
 
     }
 
